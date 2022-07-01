@@ -38,7 +38,6 @@ goodRedeemer _ redeemer _
  | redeemer == Builtins.mkI 42 = ()
  | otherwise                   = traceError "Wrong Redeemer"
 
-
 validator :: Validator
 validator = mkValidatorScript $$(PlutusTx.compile [|| goodRedeemer ||]) -- change between validator according to example:  alwaysSucceeds alwaysFails goodRedeemer
 
