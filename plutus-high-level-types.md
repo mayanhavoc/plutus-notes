@@ -106,7 +106,7 @@ goodRedeemer _ redeemer _ = traceIfFalse "Wrong Redeemer" (redeemer == 42)
 data Typed
 instance. Scripts.ValidatorTypes Typed where
     type instance DatumType Typed    = ()
-    type instance RedeemerType Type  = Integer
+    type instance RedeemerType Typed  = Integer
 
 typedValidator :: Scripts.TypedValidator Typed
 typedValidator = Scripts.mkTypedValidator @Typed
@@ -123,7 +123,7 @@ where
 validator :: Validator
 validator = mkValidatorScript typedValidator
 ```
-- The `mkValidatorScript` takes a `Typed` validator (`typedValidator`) as **input**
+- The `mkValidatorScript` changes to `Scripts.validatorScript` which takes a `Typed` validator (`typedValidator`) as **input**
 
 ### Typed Hash Validator
 ```Haskell
@@ -139,3 +139,34 @@ and now the `scrAddress` function can take the `validator` we have defined:
 
 ## Off-chain Code
 
+### Changes to the `give` function
+- 👇 The `give` function from our previous contract
+
+```Haskell
+give :: AsContractError e => Integer -> Contract w s e ()
+give amount = do
+    let tx = mustPayToOtherScript valHash (Datum $ Builtins.mkI 0) $ Ada.lovelaceValueOf amount      
+    ledgerTx <- submitTx tx                                                                          
+    void $ awaitTxConfirmed $ getCardanoTxId ledgerTx                                                
+    logInfo @String $ printf "made a gift of %d lovelace" amount                                     
+```
+
+- 👇 The **typed** version of the same `give` contract
+
+```Haskell
+give :: AsContractError e => Integer -> Contract w s e ()
+give amount = do
+    let tx = mustPayToTheScript () $ Ada.lovelaceValueOf amount               
+    ledgerTx <- submitTxConstraints typedValidator tx                         
+    void $ awaitTxConfirmed $ getCardanoTxId ledgerTx                         
+    logInfo @String $ printf "made a gift of %d lovelace" amount              
+```
+
+- `mustPayToOtherSCript` changes to `mustPayToTheScript` 
+    - `mustPayToTheScript` **doesn't** need the `valHash`, it is **inferring** it from itself. <- 🚨 ??
+- since the **Datum** is `()`, we don't need  `(Datum $ Builtins.mkI 0)`, we can itself provide `()`
+- This `give` function is using **high level** types 
+    - This means the **validator** is a **typedValidator**
+        - Just like we needed to specify the types for the `goodRedeemer` function, we specify our `typedValidator` and then pass `tx`
+            - `submitTx` changes to `submitTxConstraints typedValidator`
+                - The constraints are in relation to the **injected data types**
