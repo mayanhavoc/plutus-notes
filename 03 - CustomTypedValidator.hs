@@ -68,7 +68,7 @@ scrAddress = scriptAddress validator
 --THE OFFCHAIN CODE
 
 type GiftSchema =
-            Endpoint "give" Integer  --
+            Endpoint "give" Integer  
         .\/ Endpoint "grab" Integer
 
 give :: AsContractError e => Integer -> Contract w s e ()

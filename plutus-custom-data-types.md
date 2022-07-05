@@ -82,3 +82,52 @@ typedValidator = Scripts.mkTypedValidator @Typed      -- Tell the compiler that 
     wrap = Scripts.wrapValidator @() @MyWonderfullRedeemer 
 ```
 - Again, the only change is the substitution of the `Integer` data type for the `MyWonderfullRedeemer` data type
+
+
+## Off-chain code
+
+### Custom data type endpoints
+
+```Haskell
+type GiftSchema =
+            Endpoint "give" Integer  
+        .\/ Endpoint "grab" Integer
+```
+- The `grab` function's `Integer` is taken from the wallet, so there's no need to wrap it. 
+    - I'm taking an integer, normally from the playground, in this case it's an enpoint into the wallet, from the off-chain, no wrapper needed.
+
+- However, it does need to be (💉) injected into the code because it is passed here 👉  `Builtins.mkI n ` in 
+```Haskell
+grab :: forall w s e. AsContractError e => Integer -> Contract w s e ()                                     
+grab n = do
+    utxos <- utxosAt scrAddress                                                                      
+    let orefs   = fst <$> Map.toList utxos                                                           
+        lookups = Constraints.unspentOutputs utxos      <>                                           
+                  Constraints.otherScript validator                                                  
+        tx :: TxConstraints Void Void                                                           
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ Builtins.mkI n | oref <- orefs]  
+                                                                                                     
+    ledgerTx <- submitTxConstraintsWith @Void lookups tx                                             
+    void $ awaitTxConfirmed $ getCardanoTxId ledgerTx                                                
+    logInfo @String $ "collected gifts" 
+```
+- it needs an **auxiliary function** `PlutusTx.toBuiltinData` in 
+```Haskell
+grab :: forall w s e. AsContractError e => Integer -> Contract w s e ()                                     
+grab n = do
+    utxos <- utxosAt scrAddress                                                                      
+    let orefs   = fst <$> Map.toList utxos                                                           
+        lookups = Constraints.unspentOutputs utxos      <>                                           
+                  Constraints.otherScript validator                                                  
+        tx :: TxConstraints Void Void                                                            
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData (MWR n) | oref <- orefs]  
+                                                                                                     
+    ledgerTx <- submitTxConstraintsWith @Void lookups tx                                             
+    void $ awaitTxConfirmed $ getCardanoTxId ledgerTx                                                
+    logInfo @String $ "collected gifts"  
+```
+
+#### Recap
+1. Normal Haskell custom data type definition -> `newtype MyWonderfullRedeemer = MWR Integer`
+2. It's injected with `PlutusTx.unstableMakeIsData` (important part `MakeIsData`) which is just `Data` in PlutusTx
+3. The auxiliary function `PlutusTx.toBuiltinData` (`toBuiltinData`) which means that we are bringing the 

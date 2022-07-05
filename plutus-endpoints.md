@@ -14,7 +14,7 @@ Off-chain is a parameterized, flexible, programmable transaction construction th
 ```Haskell
 give :: asContractError e => Integer -> Contract w s e ()
 give amount = do
-    let tx = mustPayToOtherScript valHas (Datum $ Builtins.mkI 0) $ Ada.lovelaceValueOf amount
+    let tx = mustPayToOtherScript valHash (Datum $ Builtins.mkI 0) $ Ada.lovelaceValueOf amount
     ledgerTx <- submitTx tx
     void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount
